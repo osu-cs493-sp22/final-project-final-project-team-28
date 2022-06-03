@@ -6,7 +6,6 @@ const { connectToDb } = require('./lib/mongo')
 
 const app = express()
 const port = 8000
-
 /*
  * Morgan is a popular logger.
  */
