@@ -87,7 +87,7 @@ exports.deleteCourseById = deleteCourseById
 async function getStudentsByCourse(id) {
     const db = getDbReference()
     const collection = db.collection('users')
-    const studentsByCourse = await collection.aggregate([{$match: {coursesEnrolled: id} }]).toArray()
+    const studentsByCourse = await collection.aggregate([{$match: {courseId: id} }]).toArray()
     return studentsByCourse
   }
   exports.getStudentsByCourse = getStudentsByCourse

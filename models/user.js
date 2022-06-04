@@ -10,7 +10,7 @@ const UserSchema = {
   email: { required: true },
   password: { required: true },
   role: { required: true },
-  coursesEnrolled: {required: false}
+  courseId: {required: false}
 }
 exports.UserSchema = UserSchema
 
@@ -40,23 +40,14 @@ exports.emailAlreadyUsed = emailAlreadyUsed
 async function getUserById(id) {
     const db = getDbReference()
     const collection = db.collection('users')
-    if (ObjectId.isValid(id)) {
-      const businesses = await collection.aggregate(
-       [ { $match: { _id: new ObjectId(id) } },
-         {
-           $lookup: {
-             from: "courses",
-             localField: "coursesEnrolled",
-             foreignField: "_id",
-             as: "courses"
-           },
-         }
-       ]).toArray();
-       console.log(businesses[0])
-       return businesses[0]
-       } else {
-         return null;
-       }
+    if (!ObjectId.isValid(id)) {
+      return null
+    } else {
+      const users = await collection.find({
+          _id: new ObjectId(id)
+      }).toArray()
+      return users[0]
+    }
 }
 exports.getUserById = getUserById
 
@@ -82,7 +73,6 @@ async function getAllUsers() {
 }
 exports.getAllUsers = getAllUsers
 
-
 async function deleteUserById(id) {
   const db = getDbReference();
   const collection = db.collection('users');
@@ -92,4 +82,3 @@ async function deleteUserById(id) {
   return result.deletedCount > 0;
 }
 exports.deleteUserById = deleteUserById
-
