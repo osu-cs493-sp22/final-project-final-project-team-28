@@ -43,18 +43,25 @@ router.get('/:id', async (req, res) => {
 })
 
 router.put('/:id', async function (req, res, next) {
-    if (validateAgainstSchema(req.body, AssignmentSchema)) {
-       const updateSuccessful = await updateAssignmentById(req.params.id, req.body);
-       if (updateSuccessful) {
-         res.status(200).send("Updated successfully.");
-       } else {
-         next();
-       }
+    const assignmentid = await getAssignmentById(req.params.id);
+    if (!assignmentid) {
+        res.status(400).send({
+        err: "The assignment with the given ID was not found."
+        })
     } else {
-       res.status(400).send({
-         err: "Request body does not contain a valid assignment."
-       });
-    }
+        if (validateAgainstSchema(req.body, AssignmentSchema)) {
+            const updateSuccessful = await updateAssignmentById(req.params.id, req.body);
+            if (updateSuccessful) {
+            res.status(200).send("Updated successfully.");
+            } else {
+            next();
+            }
+        } else {
+            res.status(400).send({
+            err: "Request body does not contain a valid assignment."
+            });
+        }
+        }
  });
 
 router.delete('/:id', async (req, res) => {

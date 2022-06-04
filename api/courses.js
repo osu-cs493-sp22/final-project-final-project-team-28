@@ -44,17 +44,24 @@ router.get('/:id', async (req, res) => {
 })
 
 router.put('/:id', async function (req, res, next) {
-    if (validateAgainstSchema(req.body, CourseSchema)) {
-       const updateSuccessful = await updateCourseById(req.params.id, req.body);
-       if (updateSuccessful) {
-         res.status(200).send("Updated successfully.");
-       } else {
-         next();
-       }
+    const courseId = await getCourseById(req.params.id);
+    if (!courseId) {
+        res.status(400).send({
+            err: "The course with the given ID was not found."
+          })
     } else {
-       res.status(400).send({
-         err: "Request body does not contain a valid course."
-       });
+        if (validateAgainstSchema(req.body, CourseSchema)) {
+        const updateSuccessful = await updateCourseById(req.params.id, req.body);
+        if (updateSuccessful) {
+            res.status(200).send("Updated successfully.");
+        } else {
+            next();
+        }
+        } else {
+        res.status(400).send({
+            err: "Request body does not contain a valid course."
+        });
+        }
     }
  });
 
