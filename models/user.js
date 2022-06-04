@@ -1,3 +1,5 @@
+const bcrypt = require('bcryptjs')
+
 const { ObjectId } = require('mongodb')
 
 const { getDbReference } = require('../lib/mongo')
@@ -12,11 +14,12 @@ const UserSchema = {
 exports.UserSchema = UserSchema
 
 async function insertNewUser(user) {
-  user = extractValidFields(user, UserSchema)
-  const db = getDbReference()
-  const collection = db.collection('users')
-  const result = await collection.insertOne(user)
-  return result.insertedId
+    const usertoInsert = extractValidFields(user, UserSchema)
+    usertoInsert.password = await bcrypt.hash(usertoInsert.password, 8)
+    const db = getDbReference()
+    const collection = db.collection('users')
+    const result = await collection.insertOne(usertoInsert)
+    return result.insertedId
 }
 exports.insertNewUser = insertNewUser
 
@@ -26,13 +29,26 @@ async function emailAlreadyUsed(email) {
     const usersWithEmail = await collection.countDocuments({
         email: email
     })
-    console.log(usersWithEmail, usersWithEmail > 0)
     if (usersWithEmail > 0) {
         return true
     }
     return false
 }
 exports.emailAlreadyUsed = emailAlreadyUsed
+
+async function getUserById(id) {
+    const db = getDbReference()
+    const collection = db.collection('users')
+    if (!ObjectId.isValid(id)) {
+      return null
+    } else {
+      const users = await collection.find({
+          _id: new ObjectId(id)
+      }).toArray()
+      return users[0]
+    }
+}
+exports.getUserById = getUserById
 
 async function getUserByEmail(email) {
   const db = getDbReference()

@@ -68,7 +68,6 @@ router.post('/', async (req, res) => {
 
 router.get('/:id', async (req, res) => {
     const courseId = req.params.id;
-    console.log(req.params.id)
     const course = await getCourseById(courseId);
     if (course) {
       res.status(200).send(course);

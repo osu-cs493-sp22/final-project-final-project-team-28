@@ -1,18 +1,16 @@
 const { Router } = require('express')
 const bcrypt = require('bcryptjs')
-const { validateAgainstSchema, extractValidFields } = require('../lib/validation')
+const { validateAgainstSchema } = require('../lib/validation')
 const { generateAuthToken, requireAuthentication } = require('../lib/auth')
-const { insertNewUser, emailAlreadyUsed, getUserByEmail } = require('../models/user')
-const userSchema = require('../models/user')
-
-const { getDbInstance } = require('../lib/mongo')
-const { ObjectId } = require('mongodb')
+const { insertNewUser, emailAlreadyUsed, getUserByEmail, getUserById } = require('../models/user')
+const { UserSchema } = require('../models/user')
 
 const router = Router()
 
 router.post('/', async function(req, res, next) {
-    if (validateAgainstSchema(req.body, userSchema)) {
-        if (emailAlreadyUsed(req.body.email)) {
+    if (validateAgainstSchema(req.body, UserSchema)) {
+        const emailTaken = await emailAlreadyUsed(req.body.email)
+        if (emailTaken) {
             res.status(400).send({
                 error: "Email already taken"
             })
@@ -37,7 +35,7 @@ router.post('/login', async function(req, res) {
             user.password
         )
         if (authenticated) {
-            const token = generateAuthToken(req.body.id, user.role)
+            const token = generateAuthToken(user._id, user.role)
             res.status(200).send({
                 token: token
             })
