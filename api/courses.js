@@ -2,6 +2,7 @@ const { Router } = require('express')
 const { getDbReference } = require('../lib/mongo')
 
 const { validateAgainstSchema, extractValidFields} = require('../lib/validation')
+const { getAllCourses, insertNewCourse, getCourseById, deleteCourseById, updateCourseById, getStudentsByCourse} = require('../models/course')
 const {
   CourseSchema,
 } = require('../models/course.js')
@@ -9,40 +10,6 @@ const {
 const {ObjectId} = require('mongodb')
 
 const router = Router()
-
-async function getAllCourses() {
-    const db = getDbReference()
-    const collection = db.collection('courses')
-    const photos = await collection.find({}).toArray()
-    return photos
-  }
-
-async function insertNewCourse(course) {
-    let courseValues = {};
-    if (validateAgainstSchema(course, CourseSchema)) {
-      const db = getDbReference();
-      courseValues = extractValidFields(course, CourseSchema);
-      const collection = db.collection('courses');
-      const result = await collection.insertOne(courseValues);
-      return result.insertedId;
-    } else {
-      return null;
-    }
-  }
-
-async function getCourseById(id) {
-    const db = getDbReference();
-    const collection = db.collection('courses')
-   if (ObjectId.isValid(id)) {
-      const courses = await collection.find({
-        _id: new ObjectId(id)
-      }).toArray();
-      return courses[0]
-    } else {
-      return null;
-    }
-}
-
 
 router.get('/', async (req, res) => {
     const courses = await getAllCourses();
@@ -75,6 +42,62 @@ router.get('/:id', async (req, res) => {
       res.status(400).send('The course with the given ID was not found.');
     }
 })
+
+router.put('/:id', async function (req, res, next) {
+    if (validateAgainstSchema(req.body, CourseSchema)) {
+       const updateSuccessful = await updateCourseById(req.params.id, req.body);
+       if (updateSuccessful) {
+         res.status(200).send("Updated successfully.");
+       } else {
+         next();
+       }
+    } else {
+       res.status(400).send({
+         err: "Request body does not contain a valid course."
+       });
+    }
+ });
+
+router.delete('/:id', async (req, res) => {
+    const courseId = await getCourseById(req.params.id);
+    if (!courseId) {
+    res.status(400).send({
+      err: "The course with the given ID was not found."
+    })
+  } else {
+        const deleteSuccessful = await deleteCourseById(req.params.id);
+        if (deleteSuccessful) {
+        res.status(200).send("Deleted successfully.");
+        } else {
+        next();
+    }
+    }
+})
+
+router.get('/:id/students',  async (req, res) => {
+    const courseId = req.params.id;
+    const course = await getStudentsByCourse(courseId);
+    if (course.length > 0) { 
+        res.status(201).send(course);
+      } else {
+        res.status(400).json({
+          error: "No students for that course."
+        });
+      }
+})
+
+router.get('/:id/assignments',  async (req, res) => {
+    const courseId = req.params.id;
+    const course = await getAssignmentsByCourse(courseId);
+    if (course.length > 0) { 
+        res.status(201).send(course);
+      } else {
+        res.status(400).json({
+          error: "No assignments for that course."
+        });
+      }
+})
+
 
 
 module.exports = router;

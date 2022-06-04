@@ -4,42 +4,9 @@ const { validateAgainstSchema, extractValidFields} = require('../lib/validation'
 const {
   AssignmentSchema,
 } = require('../models/assignment.js')
+const { getAllAssignments, insertNewAssignment, getAssignmentById, deleteAssignmentById, updateAssignmentById} = require('../models/assignment')
 const {ObjectId} = require('mongodb')
 const router = Router()
-
-async function getAllAssignments() {
-    const db = getDbReference()
-    const collection = db.collection('assignments')
-    const photos = await collection.find({}).toArray()
-    return photos
-  }
-
-async function insertNewAssignment(assignment) {
-    let assignmentValues = {};
-    if (validateAgainstSchema(assignment, AssignmentSchema)) {
-      const db = getDbReference();
-      assignmentValues = extractValidFields(assignment, AssignmentSchema);
-      const collection = db.collection('assignments');
-      const result = await collection.insertOne(assignmentValues);
-      return result.insertedId;
-    } else {
-      return null;
-    }
-  }
-
-async function getAssignmentById(id) {
-    const db = getDbReference();
-    const collection = db.collection('assignments')
-   if (ObjectId.isValid(id)) {
-      const assignments = await collection.find({
-        _id: new ObjectId(id)
-      }).toArray();
-      return assignments[0]
-    } else {
-      return null;
-    }
-}
-
 
 router.get('/', async (req, res) => {
     const assignments = await getAllAssignments();
@@ -69,9 +36,43 @@ router.get('/:id', async (req, res) => {
     if (assignment) {
       res.status(200).send(assignment);
     } else {
-      res.status(400).send('The assignment with the given ID was not found.');
+        res.status(400).send({
+            error: "The assignment with the given ID was not found."
+        })        
     }
 })
+
+router.put('/:id', async function (req, res, next) {
+    if (validateAgainstSchema(req.body, AssignmentSchema)) {
+       const updateSuccessful = await updateAssignmentById(req.params.id, req.body);
+       if (updateSuccessful) {
+         res.status(200).send("Updated successfully.");
+       } else {
+         next();
+       }
+    } else {
+       res.status(400).send({
+         err: "Request body does not contain a valid assignment."
+       });
+    }
+ });
+
+router.delete('/:id', async (req, res) => {
+    const assignmentid = await getAssignmentById(req.params.id);
+    if (!assignmentid) {
+    res.status(400).send({
+      err: "The assignment with the given ID was not found."
+    })
+  } else {
+        const deleteSuccessful = await deleteAssignmentById(req.params.id);
+        if (deleteSuccessful) {
+        res.status(200).send("Deleted successfully.");
+        } else {
+        next();
+    }
+    }
+})
+
 
 
 module.exports = router;

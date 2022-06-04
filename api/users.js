@@ -2,11 +2,27 @@ const { Router } = require('express')
 const bcrypt = require('bcryptjs')
 const { validateAgainstSchema } = require('../lib/validation')
 const { generateAuthToken, requireAuthentication } = require('../lib/auth')
-const { insertNewUser, emailAlreadyUsed, getUserByEmail, getUserById } = require('../models/user')
+const { insertNewUser, emailAlreadyUsed, getUserByEmail, getUserById, getAllUsers, deleteUserById} = require('../models/user')
 const { UserSchema } = require('../models/user')
 
 const router = Router()
 
+router.get('/', requireAuthentication, async (req, res) => {
+    if (req.role === 'admin' || req.user == req.params.id) {
+        const users = await getAllUsers();
+        if (users.length > 0) {
+        res.status(201).send(users);
+        } else {
+        res.status(400).json({
+            error: "There is no user data to retrieve."
+        });
+        }
+    } else {
+        res.status(403).send({
+            err: "Unauthorized to access the specified resource."
+        })
+    }
+})
 router.post('/', async function(req, res, next) {
     if (validateAgainstSchema(req.body, UserSchema)) {
         const emailTaken = await emailAlreadyUsed(req.body.email)
@@ -53,18 +69,40 @@ router.post('/login', async function(req, res) {
 
 
 router.get('/:id', requireAuthentication, async function(req, res, next) {
-    if (req.role === 'admin' || req.user == req.params.id) {
-        const user = await getUserById(req.params.id)
-        if (user) {
-            res.status(200).send(user)
-        } else {
-            next()
-        }
+    const userid = await getUserById(req.params.id);
+    if (!userid) {
+      res.status(400).send({
+        err: "The user with the given ID was not found."
+      })
     } else {
-        res.status(403).send({
-            err: "Unauthorized to access the specified resource."
-        })
+        if (req.role === 'admin' || req.user == req.params.id) {
+            const user = await getUserById(req.params.id)
+            if (user) {
+                res.status(200).send(user)
+            } else {
+                next()
+            }
+        } else {
+            res.status(403).send({
+                err: "Unauthorized to access the specified resource."
+            })
+        }
     }
 })
+
+router.delete('/:id',  async function (req, res, next) {
+    const userid = await getUserById(req.params.id);
+    if (!userid) {
+      res.status(400).send({
+        err: "The user with the given ID was not found."
+      })
+    } else {
+      const deleteSuccessful = await deleteUserById(req.params.id);
+      if (deleteSuccessful) {
+        res.status(200).send("Deleted successfully.");
+      } else {
+      next();
+      }
+  }});
 
 module.exports = router
