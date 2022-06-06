@@ -1,5 +1,6 @@
 const { Router } = require('express')
 const { getDbReference } = require('../lib/mongo')
+const { generateAuthToken, requireAuthentication, optionalAuthentication } = require('../lib/auth.js')
 const { validateAgainstSchema, extractValidFields} = require('../lib/validation')
 const {
   AssignmentSchema,
@@ -8,47 +9,65 @@ const { getAllAssignments, insertNewAssignment, getAssignmentById, deleteAssignm
 const {ObjectId} = require('mongodb')
 const router = Router()
 
-router.get('/', async (req, res) => {
-    const assignments = await getAllAssignments();
-    if (assignments.length > 0) {
-      res.status(201).send(assignments);
+router.get('/', requireAuthentication, async (req, res) => {
+    if(req.role == "admin" && req.user) {
+        const assignments = await getAllAssignments();
+        if (assignments.length > 0) {
+        res.status(201).send(assignments);
+        } else {
+        res.status(400).json({
+            error: "There is no assignment data to retrieve."
+        });
+        }
     } else {
-      res.status(400).json({
-        error: "There is no assignment data to retrieve."
-      });
+        res.status(403).send({
+            err: "Unauthorized to access the specified resource."
+        })  
     }
 })
 
 router.post('/', async (req, res) => {
-    if (validateAgainstSchema(req.body, AssignmentSchema)) {
-        const id = await insertNewAssignment(req.body);
-        res.status(201).send({ id: id });
+    if(req.role == "admin" && req.user) {
+        if (validateAgainstSchema(req.body, AssignmentSchema)) {
+            const id = await insertNewAssignment(req.body);
+            res.status(201).send({ id: id });
+        } else {
+            res.status(400).json({
+                error: "Request body is not a valid assignment object."
+            });
+        }
     } else {
-        res.status(400).json({
-            error: "Request body is not a valid assignment object."
-        });
+        res.status(403).send({
+            err: "Unauthorized to access the specified resource."
+          })
     }
 })
 
-router.get('/:id', async (req, res) => {
-    const assignmentId = req.params.id;
-    const assignment = await getAssignmentById(assignmentId);
-    if (assignment) {
-      res.status(200).send(assignment);
+router.get('/:id', requireAuthentication, async (req, res) => {
+    if(req.role == "admin" || req.user.courseId == req.params.id) {
+        const assignmentId = req.params.id;
+        const assignment = await getAssignmentById(assignmentId);
+        if (assignment) {
+        res.status(200).send(assignment);
+        } else {
+            res.status(400).send({
+                error: "The assignment with the given ID was not found."
+            })        
+        }
     } else {
-        res.status(400).send({
-            error: "The assignment with the given ID was not found."
-        })        
+        res.status(403).send({
+          err: "Unauthorized to access the specified resource."
+        })
     }
 })
 
-router.put('/:id', async function (req, res, next) {
+router.put('/:id', requireAuthentication, async function (req, res, next) {
     const assignmentid = await getAssignmentById(req.params.id);
     if (!assignmentid) {
         res.status(400).send({
         err: "The assignment with the given ID was not found."
         })
-    } else {
+    } else if (req.role == "admin" && req.user){
         if (validateAgainstSchema(req.body, AssignmentSchema)) {
             const updateSuccessful = await updateAssignmentById(req.params.id, req.body);
             if (updateSuccessful) {
@@ -61,7 +80,11 @@ router.put('/:id', async function (req, res, next) {
             err: "Request body does not contain a valid assignment."
             });
         }
-        }
+    } else {
+        res.status(403).send({
+            err: "Unauthorized to access the specified resource."
+          })
+    }
  });
 
 router.delete('/:id', async (req, res) => {
@@ -70,16 +93,18 @@ router.delete('/:id', async (req, res) => {
     res.status(400).send({
       err: "The assignment with the given ID was not found."
     })
-  } else {
+    } else if(req.role == "admin" && req.user) {
         const deleteSuccessful = await deleteAssignmentById(req.params.id);
         if (deleteSuccessful) {
         res.status(200).send("Deleted successfully.");
         } else {
         next();
     }
+    } else {
+        res.status(403).send({
+            err: "Unauthorized to access the specified resource."
+        }) 
     }
 })
-
-
 
 module.exports = router;
