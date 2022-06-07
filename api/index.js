@@ -1,11 +1,10 @@
-const { Router } = require('express')
+const { Router } = require('express');
 
-const router = Router()
+const router = Router();
 
-router.use('/users', require('./users'))
-router.use('/assignments', require('./assignments.js'))
-router.use('/courses', require('./courses.js'))
+router.use('/users', require('./users'));
+router.use('/assignments', require('./assignments.js'));
+router.use('/courses', require('./courses.js'));
+router.use('/submissions', require('./submissions.js'));
 
-module.exports = router
-
-
+module.exports = router;
