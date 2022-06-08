@@ -6,7 +6,7 @@ const { connectToDb } = require('./lib/mongo');
 
 const app = express();
 const port = process.env.PORT || 8000;
-
+const redis = require('redis')
 const redisHost = process.env.REDIS_HOST
 const redisPort = process.env.REDIS_PORT || 6379
 

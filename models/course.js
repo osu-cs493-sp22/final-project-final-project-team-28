@@ -22,6 +22,33 @@ async function getAllCourses() {
 }
 exports.getAllCourses = getAllCourses;
 
+async function getCoursesPage(page) {
+	const db = getDbReference()
+	const collection = db.collection('courses')
+	const count = await collection.countDocuments()
+
+	const pageSize = 10
+	const lastPage = Math.ceil(count / pageSize)
+	page = page > lastPage ? lastPage : page
+	page = page < 1 ? 1 : page
+	const offset = (page - 1) * pageSize
+  
+	const results = await collection.find({})
+	  .sort({ _id: 1 })
+	  .skip(offset)
+	  .limit(pageSize)
+	  .toArray()
+  
+	return {
+	  courses: results,
+	  page: page,
+	  totalPages: lastPage,
+	  pageSize: pageSize,
+	  count: count
+	}
+  }
+  exports.getCoursesPage = getCoursesPage
+
 async function insertNewCourse(course) {
 	let courseValues = {};
 	if (validateAgainstSchema(course, CourseSchema)) {

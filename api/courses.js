@@ -11,12 +11,14 @@ const {
 	getAssignmentsByCourse,
 	addStudentsToCourse,
 	removeStudentsFromCourse,
+	getCoursesPage
 } = require('../models/course');
 const { CourseSchema } = require('../models/course.js');
 
 const router = Router();
 
 router.get('/', async (req, res) => {
+	/*
 	const courses = await getAllCourses();
 	if (courses.length > 0) {
 		res.status(201).send(courses);
@@ -24,7 +26,25 @@ router.get('/', async (req, res) => {
 		res.status(400).json({
 			error: 'There is no course data to retrieve.',
 		});
-	}
+	}*/
+	try {
+		const coursePage = await getCoursesPage(parseInt(req.query.page) || 1)
+		coursePage.links = {}
+		if (coursePage.page < coursePage.totalPages) {
+			coursePage.links.nextPage = `/courses?page=${coursePage.page + 1}`
+			coursePage.links.lastPage = `/courses?page=${coursePage.totalPages}`
+		}
+		if (coursePage.page > 1) {
+			coursePage.links.prevPage = `/courses?page=${coursePage.page - 1}`
+			coursePage.links.firstPage = '/courses?page=1'
+		}
+		res.status(200).send(coursePage)
+	  } catch (err) {
+		console.error(err)
+		res.status(500).send({
+		  error: "Error fetching courses list.  Please try again later."
+		})
+	  }
 });
 
 router.post('/', requireAuthentication, async (req, res) => {
