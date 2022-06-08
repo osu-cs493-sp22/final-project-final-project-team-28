@@ -114,11 +114,9 @@ exports.deleteCourseById = deleteCourseById;
 
 async function getStudentsByCourse(id) {
 	const db = getDbReference();
-	const collection = db.collection('users');
-	const studentsByCourse = await collection
-		.aggregate([{ $match: { courseId: id } }])
-		.toArray();
-	return studentsByCourse;
+	const collection = db.collection('courses');
+	const course = await collection.find({ _id: new ObjectId(id) }).toArray();
+	return course[0].students;
 }
 exports.getStudentsByCourse = getStudentsByCourse;
 
