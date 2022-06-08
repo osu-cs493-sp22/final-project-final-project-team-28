@@ -160,25 +160,21 @@ router.post('/:id/students', requireAuthentication, async (req, res) => {
 	}
 });
 
-router.get('/:id/assignments', requireAuthentication, async (req, res) => {
-	const courseId = await getCourseById(req.params.id);
-	if (!courseId) {
-		res.status(400).send({
-			err: 'The course with the given ID was not found.',
-		});
-	} else if (req.role == 'admin' && req.user) {
-		const courseId = req.params.id;
-		const course = await getAssignmentsByCourse(courseId);
-		if (course.length > 0) {
-			res.status(201).send(course);
+router.get('/:id/assignments', async (req, res) => {
+	const courseId = req.params.id;
+	const course = await getCourseById(courseId);
+	if (course) {
+		const assignments = await getAssignmentsByCourse(courseId);
+		if (assignments.length > 0) {
+			res.status(201).send(assignments);
 		} else {
 			res.status(400).json({
 				error: 'No assignments for that course.',
 			});
 		}
 	} else {
-		res.status(403).send({
-			err: 'Unauthorized to access the specified resource.',
+		res.status(400).send({
+			err: 'The course with the given ID was not found.',
 		});
 	}
 });
