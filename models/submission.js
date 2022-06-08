@@ -93,3 +93,30 @@ async function getAssignmentSubmissions(id) {
 	return submissions;
 }
 exports.getAssignmentSubmissions = getAssignmentSubmissions;
+
+async function getSubmissionsPage(page) {
+	const db = getDbReference()
+	const collection = db.collection('submissions.files')
+	const count = await collection.countDocuments()
+
+	const pageSize = 5
+	const lastPage = Math.ceil(count / pageSize)
+	page = page > lastPage ? lastPage : page
+	page = page < 1 ? 1 : page
+	const offset = (page - 1) * pageSize
+  
+	const results = await collection.find({})
+	  .sort({ _id: 1 })
+	  .skip(offset)
+	  .limit(pageSize)
+	  .toArray()
+  
+	return {
+	  submissions: results,
+	  page: page,
+	  totalPages: lastPage,
+	  pageSize: pageSize,
+	  count: count
+	}
+  }
+  exports.getSubmissionsPage = getSubmissionsPage

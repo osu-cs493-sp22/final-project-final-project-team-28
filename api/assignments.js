@@ -16,6 +16,7 @@ const {
 	saveSubmissionFile,
 	removeUploadedFile,
 	getAssignmentSubmissions,
+	getSubmissionsPage
 } = require('../models/submission');
 
 const photoTypes = {
@@ -140,8 +141,26 @@ router.get(
 			(req.role === 'admin' && req.user) ||
 			(req.role === 'instructor' && req.user === course.instructorId)
 		) {
-			const submissions = await getAssignmentSubmissions(req.params.id);
-			res.status(201).send({ submissions: submissions });
+		//	const submissions = await getAssignmentSubmissions(req.params.id);
+		//			res.status(201).send({ submissions: submissions });
+		try {
+			const submissionsPage = await getSubmissionsPage(parseInt(req.query.page) || 1)
+			submissionsPage.links = {}
+			if (submissionsPage.page < submissionsPage.totalPages) {
+				submissionsPage.links.nextPage = `/assignments/${req.body.assignmentId}/submissions?page=${submissionsPage.page + 1}`
+				submissionsPage.links.lastPage = `/assignments/${req.body.assignmentId}/submissions?page=${submissionsPage.totalPages}`
+			}
+			if (submissionsPage.page > 1) {
+				submissionsPage.links.prevPage = `/assignments/${req.body.assignmentId}/submissions?page=${submissionsPage.page - 1}`
+				coursubmissionsPagesePage.links.firstPage = '/assignments/${req.body.assignmentId}/submissions?page=1'
+			}
+			res.status(200).send(submissionsPage)
+		  } catch (err) {
+			console.error(err)
+			res.status(500).send({
+			  error: "Error fetching submissions list.  Please try again later."
+			})
+		  }
 		} else {
 			res.status(403).send({
 				err: 'Unauthorized to access the specified resource.',
@@ -150,11 +169,7 @@ router.get(
 	}
 );
 
-router.post(
-	'/:id/submissions',
-	upload.single('file'),
-	requireAuthentication,
-	async (req, res, next) => {
+router.post('/:id/submissions',	upload.single('file'), requireAuthentication, async (req, res, next) => {
 		if (!validateAgainstSchema(req.body, SubmissionSchema)) {
 			res.status(400).send({
 				err: 'Request body needs a valid submission object.',
