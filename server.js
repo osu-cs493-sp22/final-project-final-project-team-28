@@ -22,11 +22,33 @@ async function rateLimit(req, res, next) {
 	let tokenBucket
 	try {
 	  tokenBucket = await redisClient.hGetAll(ip)
-	} catch (e) {
+	} 
+	catch (e) {
 	  next()
 	  return
 	}
-	next();
+
+	tokenBucket = {
+		tokens: parseFloat(tokenBucket.tokens) || rateLimitMaxRequests,
+		last: parseInt(tokenBucket.last) || now
+	}
+	const elapsedMs = now - tokenBucket.last
+
+	tokenBucket.tokens += elapsedMs * (rateLimitMaxRequests / rateLimitWindowMs)
+  	tokenBucket.tokens = Math.min(rateLimitMaxRequests, tokenBucket.tokens)
+  	tokenBucket.last = now
+	
+	if (tokenBucket.tokens >= 1) {
+	tokenBucket.tokens -= 1
+	await redisClient.hSet(ip, [['tokens', tokenBucket.tokens], ['last', tokenBucket.last]])
+	next()
+	} 
+	else {
+	await redisClient.hSet(ip, [['tokens', tokenBucket.tokens], ['last', tokenBucket.last]])
+	res.status(429).send({
+		err: "Too many requests per minute"
+		})
+	}
 }
 /*
  * Morgan is a popular logger.
