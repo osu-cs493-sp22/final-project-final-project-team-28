@@ -21,11 +21,11 @@ async function rateLimit(req, res, next) {
   
 	let tokenBucket
 	try {
-	  tokenBucket = await redisClient.hGetAll(ip)
+	  	tokenBucket = await redisClient.hGetAll(ip)
 	} 
 	catch (e) {
-	  next()
-	  return
+		next()
+		return
 	}
 
 	tokenBucket = {
@@ -39,14 +39,14 @@ async function rateLimit(req, res, next) {
   	tokenBucket.last = now
 	
 	if (tokenBucket.tokens >= 1) {
-	tokenBucket.tokens -= 1
-	await redisClient.hSet(ip, [['tokens', tokenBucket.tokens], ['last', tokenBucket.last]])
-	next()
+		tokenBucket.tokens -= 1
+		await redisClient.hSet(ip, [['tokens', tokenBucket.tokens], ['last', tokenBucket.last]])
+		next()
 	} 
 	else {
-	await redisClient.hSet(ip, [['tokens', tokenBucket.tokens], ['last', tokenBucket.last]])
-	res.status(429).send({
-		err: "Too many requests per minute"
+		await redisClient.hSet(ip, [['tokens', tokenBucket.tokens], ['last', tokenBucket.last]])
+		res.status(429).send({
+			err: "Too many requests per minute"
 		})
 	}
 }
