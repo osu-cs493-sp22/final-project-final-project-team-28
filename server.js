@@ -15,7 +15,19 @@ const redisClient = redis.createClient(redisHost, redisPort)
 const rateLimitMaxRequests = 5
 const rateLimitWindowMs = 60000
 
-async function rateLimit(req, res, next) {}
+async function rateLimit(req, res, next) {
+	const ip = req.ip
+	const now = Date.now()
+  
+	let tokenBucket
+	try {
+	  tokenBucket = await redisClient.hGetAll(ip)
+	} catch (e) {
+	  next()
+	  return
+	}
+	next();
+}
 /*
  * Morgan is a popular logger.
  */
@@ -23,6 +35,8 @@ app.use(morgan('dev'));
 
 app.use(express.json());
 app.use(express.static('public'));
+
+app.use(rateLimit);
 
 /*
  * All routes for the API are written in modules in the api/ directory.  The
