@@ -5,7 +5,17 @@ const api = require('./api');
 const { connectToDb } = require('./lib/mongo');
 
 const app = express();
-const port = 8000;
+const port = process.env.PORT || 8000;
+
+const redisHost = process.env.REDIS_HOST
+const redisPort = process.env.REDIS_PORT || 6379
+
+const redisClient = redis.createClient(redisHost, redisPort)
+
+const rateLimitMaxRequests = 5
+const rateLimitWindowMs = 60000
+
+async function rateLimit(req, res, next) {}
 /*
  * Morgan is a popular logger.
  */
