@@ -63,7 +63,7 @@ router.get('/:id', requireAuthentication, async (req, res) => {
 	}
 });
 
-router.put('/:id', requireAuthentication, async function (req, res, next) {
+router.put('/:id', requireAuthentication, async (req, res, next) => {
 	const assignmentid = await getAssignmentById(req.params.id);
 	if (!assignmentid) {
 		res.status(400).send({

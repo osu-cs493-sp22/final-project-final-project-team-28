@@ -27,6 +27,8 @@ async function insertNewCourse(course) {
 	if (validateAgainstSchema(course, CourseSchema)) {
 		const db = getDbReference();
 		courseValues = extractValidFields(course, CourseSchema);
+		courseValues.students = [];
+		courseValues.assignments = [];
 		const collection = db.collection('courses');
 		const result = await collection.insertOne(courseValues);
 		return result.insertedId;
@@ -102,3 +104,35 @@ async function getAssignmentsByCourse(id) {
 	return studentsByCourse;
 }
 exports.getAssignmentsByCourse = getAssignmentsByCourse;
+
+async function addStudentsToCourse(id, studentIDs) {
+	const db = getDbReference();
+	const collection = db.collection('courses');
+	await collection.updateOne(
+		{ _id: new ObjectId(id) },
+		{
+			$addToSet: {
+				students: {
+					$each: studentIDs,
+				},
+			},
+		}
+	);
+}
+exports.addStudentsToCourse = addStudentsToCourse;
+
+async function removeStudentsFromCourse(id, studentIDs) {
+	const db = getDbReference();
+	const collection = db.collection('courses');
+	await collection.updateOne(
+		{ _id: new ObjectId(id) },
+		{
+			$pull: {
+				students: {
+					$in: studentIDs,
+				},
+			},
+		}
+	);
+}
+exports.removeStudentsFromCourse = removeStudentsFromCourse;

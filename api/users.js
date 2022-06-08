@@ -44,7 +44,7 @@ router.post('/', optionalAuthentication, async (req, res, next) => {
 	}
 });
 
-router.post('/login', async function (req, res) {
+router.post('/login', async (req, res) => {
 	if (req.body && req.body.email && req.body.password) {
 		const user = await getUserByEmail(req.body.email, true);
 		const authenticated =
@@ -66,7 +66,7 @@ router.post('/login', async function (req, res) {
 	}
 });
 
-router.get('/:id', requireAuthentication, async function (req, res, next) {
+router.get('/:id', requireAuthentication, async (req, res, next) => {
 	const userid = await getUserById(req.params.id);
 	if (!userid) {
 		res.status(400).send({
