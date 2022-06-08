@@ -111,5 +111,75 @@ router.delete('/:id', async (req, res) => {
 		});
 	}
 });
+const crypto = require('crypto');
+const multer = require('multer');
+const { SubmissionSchema, saveSubmissionFile, getSubmissionInfoById, removeUploadedFile} = require('../models/submission');
+const photoTypes = {
+	'image/jpeg': 'jpg',
+	'image/png': 'png'
+  };
+const upload = multer({ 
+	storage: multer.diskStorage({
+	  destination: `${__dirname}/uploads`,
+	  filename: function (req, file, callback) {
+	   const ext = photoTypes[file.mimetype]
+	   const filename = crypto.pseudoRandomBytes(16).toString('hex')
+	   callback(null, `${filename}.${ext}`)
+	  }
+	}),
+	fileFilter: function (req, file, callback) {
+	  callback(null, !!photoTypes[file.mimetype])
+	}
+  });
+
+router.post('/:id/submissions', upload.single('file'),  async (req, res, next) => {
+    console.log("== req.file:", req.file)
+    console.log("== req.body:", req.body)
+    if ((validateAgainstSchema(req.body, SubmissionSchema))) {
+        try {
+            const submission = {
+				assignmentId: req.body.assignmentId,
+				studentId: req.body.studentId,
+				timestamp: Math.floor(Date.now() /1000),
+				grade: req.body.grade,
+				path: req.file.path,
+				filename: req.file.filename,
+				mimetype: req.file.mimetype
+            }
+            const id = await saveSubmissionFile(submission)
+			await removeUploadedFile(submission.path)
+			res.status(200).send({ id: id })
+          } catch (err) {
+            next (err)
+          }
+    } else {
+        res.status(400).send({
+          err: "Request body needs a valid submission object."
+        })
+  }
+  })
+  
+router.get('/:id/submissions', async function (req,res,next) {
+    try {
+		const submission = await getSubmissionInfoById(req.params.id);
+		console.log(submission)
+		if (submission) {
+		  const resBody = {
+			_id: submission._id,
+			submission: `/media/submissions/${submission._id}.${photoTypes[submission.metadata.mimetype]}`,
+			mimetype: submission.metadata.mimetype,
+			assignmentId: submission.assignmentId,
+			studentId: submission.studentId,
+			timestamp: submission.timestamp,
+			grade: submission.grade,
+		  }
+		  res.status(200).send(resBody);
+		} else {
+		  next();
+		}
+	  } catch (err) {
+		next(err);
+	  }
+  })
 
 module.exports = router;
