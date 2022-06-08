@@ -2,13 +2,42 @@ const { Router } = require('express');
 const { requireAuthentication } = require('../lib/auth.js');
 const { validateAgainstSchema } = require('../lib/validation');
 const { AssignmentSchema } = require('../models/assignment.js');
+const crypto = require('crypto');
+const multer = require('multer');
+const { getCourseById, getStudentsByCourse } = require('../models/course.js');
 const {
 	insertNewAssignment,
 	getAssignmentById,
 	deleteAssignmentById,
 	updateAssignmentById,
 } = require('../models/assignment');
+const {
+	SubmissionSchema,
+	saveSubmissionFile,
+	removeUploadedFile,
+	getAssignmentSubmissions,
+} = require('../models/submission');
+
+const photoTypes = {
+	'image/jpeg': 'jpg',
+	'image/png': 'png',
+};
+
 const router = Router();
+
+const upload = multer({
+	storage: multer.diskStorage({
+		destination: `${__dirname}/uploads`,
+		filename: function (req, file, callback) {
+			const ext = photoTypes[file.mimetype];
+			const filename = crypto.pseudoRandomBytes(16).toString('hex');
+			callback(null, `${filename}.${ext}`);
+		},
+	}),
+	fileFilter: function (req, file, callback) {
+		callback(null, !!photoTypes[file.mimetype]);
+	},
+});
 
 router.post('/', requireAuthentication, async (req, res) => {
 	if (validateAgainstSchema(req.body, AssignmentSchema)) {
@@ -44,13 +73,12 @@ router.get('/:id', async (req, res) => {
 });
 
 router.put('/:id', requireAuthentication, async (req, res, next) => {
-	const assignmentid = await getAssignmentById(req.params.id);
-	if (!assignmentid) {
-		res.status(400).send({
-			err: 'The assignment with the given ID was not found.',
-		});
-	} else if (req.role == 'admin' && req.user) {
-		if (validateAgainstSchema(req.body, AssignmentSchema)) {
+	if (validateAgainstSchema(req.body, AssignmentSchema)) {
+		const course = await getCourseById(req.body.courseId);
+		if (
+			(req.role === 'admin' && req.user) ||
+			(req.role === 'instructor' && req.user === course.instructorId)
+		) {
 			const updateSuccessful = await updateAssignmentById(
 				req.params.id,
 				req.body
@@ -61,24 +89,29 @@ router.put('/:id', requireAuthentication, async (req, res, next) => {
 				next();
 			}
 		} else {
-			res.status(400).send({
-				err: 'Request body does not contain a valid assignment.',
+			res.status(403).send({
+				err: 'Unauthorized to access the specified resource.',
 			});
 		}
 	} else {
-		res.status(403).send({
-			err: 'Unauthorized to access the specified resource.',
+		res.status(400).json({
+			error: 'Request body is not a valid assignment object.',
 		});
 	}
 });
 
-router.delete('/:id', async (req, res) => {
-	const assignmentid = await getAssignmentById(req.params.id);
-	if (!assignmentid) {
+router.delete('/:id', requireAuthentication, async (req, res) => {
+	const assignment = await getAssignmentById(req.params.id);
+	if (!assignment) {
 		res.status(400).send({
 			err: 'The assignment with the given ID was not found.',
 		});
-	} else if (req.role == 'admin' && req.user) {
+	}
+	const course = await getCourseById(assignment.courseId);
+	if (
+		(req.role === 'admin' && req.user) ||
+		(req.role === 'instructor' && req.user === course.instructorId)
+	) {
 		const deleteSuccessful = await deleteAssignmentById(req.params.id);
 		if (deleteSuccessful) {
 			res.status(200).send('Deleted successfully.');
@@ -91,40 +124,45 @@ router.delete('/:id', async (req, res) => {
 		});
 	}
 });
-const crypto = require('crypto');
-const multer = require('multer');
-const {
-	SubmissionSchema,
-	saveSubmissionFile,
-	getSubmissionInfoById,
-	removeUploadedFile,
-} = require('../models/submission');
-const { getCourseById } = require('../models/course.js');
-const photoTypes = {
-	'image/jpeg': 'jpg',
-	'image/png': 'png',
-};
-const upload = multer({
-	storage: multer.diskStorage({
-		destination: `${__dirname}/uploads`,
-		filename: function (req, file, callback) {
-			const ext = photoTypes[file.mimetype];
-			const filename = crypto.pseudoRandomBytes(16).toString('hex');
-			callback(null, `${filename}.${ext}`);
-		},
-	}),
-	fileFilter: function (req, file, callback) {
-		callback(null, !!photoTypes[file.mimetype]);
-	},
-});
+
+router.get(
+	'/:id/submissions',
+	requireAuthentication,
+	async function (req, res) {
+		const assignment = await getAssignmentById(req.params.id);
+		if (!assignment) {
+			res.status(400).send({
+				err: 'The assignment with the given ID was not found.',
+			});
+		}
+		const course = await getCourseById(assignment.courseId);
+		if (
+			(req.role === 'admin' && req.user) ||
+			(req.role === 'instructor' && req.user === course.instructorId)
+		) {
+			const submissions = await getAssignmentSubmissions(req.params.id);
+			res.status(201).send({ submissions: submissions });
+		} else {
+			res.status(403).send({
+				err: 'Unauthorized to access the specified resource.',
+			});
+		}
+	}
+);
 
 router.post(
 	'/:id/submissions',
 	upload.single('file'),
+	requireAuthentication,
 	async (req, res, next) => {
-		console.log('== req.file:', req.file);
-		console.log('== req.body:', req.body);
-		if (validateAgainstSchema(req.body, SubmissionSchema)) {
+		if (!validateAgainstSchema(req.body, SubmissionSchema)) {
+			res.status(400).send({
+				err: 'Request body needs a valid submission object.',
+			});
+		}
+		const assignment = await getAssignmentById(req.body.assignmentId);
+		const students = await getStudentsByCourse(assignment.courseId);
+		if (req.role === 'student' && students.indexOf(students) !== 0) {
 			try {
 				const submission = {
 					assignmentId: req.body.assignmentId,
@@ -142,36 +180,11 @@ router.post(
 				next(err);
 			}
 		} else {
-			res.status(400).send({
-				err: 'Request body needs a valid submission object.',
+			res.status(403).send({
+				err: 'Unauthorized to access the specified resource.',
 			});
 		}
 	}
 );
-
-router.get('/:id/submissions', async function (req, res, next) {
-	try {
-		const submission = await getSubmissionInfoById(req.params.id);
-		console.log(submission);
-		if (submission) {
-			const resBody = {
-				_id: submission._id,
-				submission: `/media/submissions/${submission._id}.${
-					photoTypes[submission.metadata.mimetype]
-				}`,
-				mimetype: submission.metadata.mimetype,
-				assignmentId: submission.assignmentId,
-				studentId: submission.studentId,
-				timestamp: submission.timestamp,
-				grade: submission.grade,
-			};
-			res.status(200).send(resBody);
-		} else {
-			next();
-		}
-	} catch (err) {
-		next(err);
-	}
-});
 
 module.exports = router;
