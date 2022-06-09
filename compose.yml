@@ -11,20 +11,6 @@ services:
     ports:
       - 6379:6379
 
-  db-init:
-    build: .
-    environment:
-      MONGO_HOST: db
-      MONGO_USER: ${MONGO_ROOT_USER}
-      MONGO_PASSWORD: ${MONGO_ROOT_PASSWORD}
-      MONGO_DB_NAME: ${MONGO_DB_NAME}
-      MONGO_AUTH_DB_NAME: admin
-      MONGO_CREATE_USER: ${MONGO_USER}
-      MONGO_CREATE_PASSWORD: ${MONGO_PASSWORD}
-    depends_on:
-      - db
-    restart: on-failure
-
   api:
     build: .
     ports:
