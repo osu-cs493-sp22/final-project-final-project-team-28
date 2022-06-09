@@ -50,8 +50,6 @@ async function rateLimit(req, res, next) {
 
   	tokenBucket.last = now
 	
-	//console.log("timeValue:", elapsedMs * (rateLimitMaxRequests / rateLimitWindowMs))
-
 	if (tokenBucket.tokens >= 1) {
 		tokenBucket.tokens -= 1
 		await redisClient.hSet(ip, [['tokens', tokenBucket.tokens], ['last', tokenBucket.last]])
@@ -93,12 +91,4 @@ redisClient.connect().then(connectToDb(() => {
 		console.log('== Server is running on port', port);
 	});
 }))
-
-/*
-connectToDb(() => {
-	app.listen(port, function () {
-		console.log('== Server is running on port', port);
-	});
-});
-*/
 
