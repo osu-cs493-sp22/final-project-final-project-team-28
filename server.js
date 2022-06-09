@@ -1,5 +1,6 @@
 const express = require('express');
 const morgan = require('morgan');
+const redis = require('redis')
 
 const api = require('./api');
 const { connectToDb } = require('./lib/mongo');
@@ -7,10 +8,10 @@ const { connectToDb } = require('./lib/mongo');
 const app = express();
 const port = process.env.PORT || 8000;
 
-const redisHost = process.env.REDIS_HOST
+const redisHost = process.env.REDIS_HOST || 'localhost'
 const redisPort = process.env.REDIS_PORT || 6379
 
-const redisClient = redis.createClient(redisHost, redisPort)
+const redisClient = redis.createClient({url: `redis://${redisHost}:${redisPort}`})
 
 const rateLimitMaxRequests = 5
 const rateLimitWindowMs = 60000
@@ -38,6 +39,7 @@ async function rateLimit(req, res, next) {
   	tokenBucket.tokens = Math.min(rateLimitMaxRequests, tokenBucket.tokens)
   	tokenBucket.last = now
 	
+	console.log("tokens:", tokenBucket.tokens)
 	if (tokenBucket.tokens >= 1) {
 		tokenBucket.tokens -= 1
 		await redisClient.hSet(ip, [['tokens', tokenBucket.tokens], ['last', tokenBucket.last]])
@@ -74,8 +76,12 @@ app.use('*', function (err, req, res, next) {
 	});
 });
 
-connectToDb(() => {
+redisClient.connect().then(connectToDb(() => {
 	app.listen(port, function () {
 		console.log('== Server is running on port', port);
 	});
-});
+}));
+
+
+
+
