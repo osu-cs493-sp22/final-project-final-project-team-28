@@ -76,11 +76,11 @@ app.use('*', function (err, req, res, next) {
 	});
 });
 
-redisClient.connect().then(connectToDb(() => {
+connectToDb(() => {
 	app.listen(port, function () {
 		console.log('== Server is running on port', port);
 	});
-}));
+});
 
 
 
