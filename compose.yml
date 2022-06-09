@@ -1,13 +1,5 @@
 services:
-  db:
-    image: mongo
-
-  redis:
-    image: redis
-    ports:
-      - 6379:6379
-
-  api:
+  backendapi:
     build: .
     ports:
       - 8000:8000
@@ -15,8 +7,12 @@ services:
       MONGO_HOST: db
       MONGO_USER: plim1025
       MONGO_PASSWORD: HztCYK5vmdax7s8J
-      MONGO_DB_NAME: Assignment4
+      MONGO_DB_NAME: Tarpaulin
     depends_on:
-      - db
       - redis
     restart: on-failure
+
+  redis:
+    image: redis:latest
+    ports:
+      - 6379:6379 
