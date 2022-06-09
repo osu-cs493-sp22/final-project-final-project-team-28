@@ -17,23 +17,17 @@ const rateLimitMaxRequests = 5
 const rateLimitWindowMs = 60000
 
 async function rateLimit(req, res, next) {
-	const ip = req.ip
-	const now = Date.now()
-  
-	let tokenBucket
-	try {
-	  	tokenBucket = await redisClient.hGetAll(ip)
-	} 
-	catch (e) {
-		next()
-		return
-	}
+ 	const ip = req.ip
+ 	const now = Date.now()
 
-	tokenBucket = {
-		tokens: parseFloat(tokenBucket.tokens) || rateLimitMaxRequests,
-		last: parseInt(tokenBucket.last) || now
-	}
-	const elapsedMs = now - tokenBucket.last
+ 	let tokenBucket
+ 	try {
+ 	  	tokenBucket = await redisClient.hGetAll(ip)
+ 	}
+ 	catch (e) {
+ 		next()
+ 		return
+ 	}
 
 	tokenBucket.tokens += elapsedMs * (rateLimitMaxRequests / rateLimitWindowMs)
   	tokenBucket.tokens = Math.min(rateLimitMaxRequests, tokenBucket.tokens)

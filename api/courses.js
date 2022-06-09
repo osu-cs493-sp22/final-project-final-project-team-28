@@ -9,26 +9,42 @@ const {
 	updateCourseById,
 	getStudentsByCourse,
 	getAssignmentsByCourse,
+	addStudentsToCourse,
+	removeStudentsFromCourse,
+	getCoursesPage
 } = require('../models/course');
 const { CourseSchema } = require('../models/course.js');
 
 const router = Router();
 
-router.get('/', requireAuthentication, async (req, res) => {
-	if (req.role == 'admin' && req.user) {
-		const courses = await getAllCourses();
-		if (courses.length > 0) {
-			res.status(201).send(courses);
-		} else {
-			res.status(400).json({
-				error: 'There is no course data to retrieve.',
-			});
-		}
+router.get('/', async (req, res) => {
+	/*
+	const courses = await getAllCourses();
+	if (courses.length > 0) {
+		res.status(201).send(courses);
 	} else {
-		res.status(403).send({
-			err: 'Unauthorized to access the specified resource.',
+		res.status(400).json({
+			error: 'There is no course data to retrieve.',
 		});
-	}
+	}*/
+	try {
+		const coursePage = await getCoursesPage(parseInt(req.query.page) || 1)
+		coursePage.links = {}
+		if (coursePage.page < coursePage.totalPages) {
+			coursePage.links.nextPage = `/courses?page=${coursePage.page + 1}`
+			coursePage.links.lastPage = `/courses?page=${coursePage.totalPages}`
+		}
+		if (coursePage.page > 1) {
+			coursePage.links.prevPage = `/courses?page=${coursePage.page - 1}`
+			coursePage.links.firstPage = '/courses?page=1'
+		}
+		res.status(200).send(coursePage)
+	  } catch (err) {
+		console.error(err)
+		res.status(500).send({
+		  error: "Error fetching courses list.  Please try again later."
+		})
+	  }
 });
 
 router.post('/', requireAuthentication, async (req, res) => {
@@ -48,29 +64,27 @@ router.post('/', requireAuthentication, async (req, res) => {
 	}
 });
 
-router.get('/:id', requireAuthentication, async (req, res) => {
-	if (req.role == 'admin' || req.user.courseId == req.params.id) {
-		const courseId = req.params.id;
-		const course = await getCourseById(courseId);
-		if (course) {
-			res.status(200).send(course);
-		} else {
-			res.status(400).send('The course with the given ID was not found.');
-		}
+router.get('/:id', async (req, res) => {
+	const course = await getCourseById(req.params.id);
+	if (course) {
+		res.status(200).send(course);
 	} else {
-		res.status(403).send({
-			err: 'Unauthorized to access the specified resource.',
+		res.status(400).send({
+			err: 'The course with the given ID was not found.',
 		});
 	}
 });
 
 router.put('/:id', requireAuthentication, async function (req, res, next) {
-	const courseId = await getCourseById(req.params.id);
-	if (!courseId) {
+	const course = await getCourseById(req.params.id);
+	if (!course) {
 		res.status(400).send({
 			err: 'The course with the given ID was not found.',
 		});
-	} else if (req.role == 'admin' && req.user) {
+	} else if (
+		(req.role == 'admin' && req.user) ||
+		(req.role == 'instructor' && req.user === course.instructorId)
+	) {
 		if (validateAgainstSchema(req.body, CourseSchema)) {
 			const updateSuccessful = await updateCourseById(
 				req.params.id,
@@ -102,7 +116,9 @@ router.delete('/:id', requireAuthentication, async (req, res) => {
 	} else if (req.role == 'admin' && req.user) {
 		const deleteSuccessful = await deleteCourseById(req.params.id);
 		if (deleteSuccessful) {
-			res.status(200).send('Deleted successfully.');
+			res.status(200).send({
+				err: 'Deleted successfully.',
+			});
 		} else {
 			next();
 		}
@@ -114,16 +130,18 @@ router.delete('/:id', requireAuthentication, async (req, res) => {
 });
 
 router.get('/:id/students', requireAuthentication, async (req, res) => {
-	const courseId = await getCourseById(req.params.id);
-	if (!courseId) {
+	const course = await getCourseById(req.params.id);
+	if (!course) {
 		res.status(400).send({
 			err: 'The course with the given ID was not found.',
 		});
-	} else if (req.role == 'admin' && req.user) {
-		const courseId = req.params.id;
-		const course = await getStudentsByCourse(courseId);
-		if (course.length > 0) {
-			res.status(201).send(course);
+	} else if (
+		(req.role == 'admin' && req.user) ||
+		(req.role == 'instructor' && req.user === course.instructorId)
+	) {
+		const students = await getStudentsByCourse(req.params.id);
+		if (students.length > 0) {
+			res.status(201).send(students);
 		} else {
 			res.status(400).json({
 				error: 'No students for that course.',
@@ -136,25 +154,47 @@ router.get('/:id/students', requireAuthentication, async (req, res) => {
 	}
 });
 
-router.get('/:id/assignments', requireAuthentication, async (req, res) => {
-	const courseId = await getCourseById(req.params.id);
-	if (!courseId) {
+router.post('/:id/students', requireAuthentication, async (req, res) => {
+	const course = await getCourseById(req.params.id);
+	if (!course) {
 		res.status(400).send({
 			err: 'The course with the given ID was not found.',
 		});
-	} else if (req.role == 'admin' && req.user) {
-		const courseId = req.params.id;
-		const course = await getAssignmentsByCourse(courseId);
-		if (course.length > 0) {
-			res.status(201).send(course);
+	} else if (!req.body.add || !req.body.remove) {
+		res.status(400).json({
+			error: 'Request body must include list of student IDs to add and remove to course',
+		});
+	} else if (
+		(req.role == 'admin' && req.user) ||
+		(req.role == 'instructor' && req.user === course.instructorId)
+	) {
+		const studentsToAdd = req.body.add;
+		const studentsToRemove = req.body.remove;
+		await addStudentsToCourse(req.params.id, studentsToAdd);
+		await removeStudentsFromCourse(req.params.id, studentsToRemove);
+		res.status(201).send('Enrollment updated for course');
+	} else {
+		res.status(403).send({
+			err: 'Unauthorized to access the specified resource.',
+		});
+	}
+});
+
+router.get('/:id/assignments', async (req, res) => {
+	const courseId = req.params.id;
+	const course = await getCourseById(courseId);
+	if (course) {
+		const assignments = await getAssignmentsByCourse(courseId);
+		if (assignments.length > 0) {
+			res.status(201).send(assignments);
 		} else {
 			res.status(400).json({
 				error: 'No assignments for that course.',
 			});
 		}
 	} else {
-		res.status(403).send({
-			err: 'Unauthorized to access the specified resource.',
+		res.status(400).send({
+			err: 'The course with the given ID was not found.',
 		});
 	}
 });

@@ -22,11 +22,40 @@ async function getAllCourses() {
 }
 exports.getAllCourses = getAllCourses;
 
+async function getCoursesPage(page) {
+	const db = getDbReference()
+	const collection = db.collection('courses')
+	const count = await collection.countDocuments()
+
+	const pageSize = 10
+	const lastPage = Math.ceil(count / pageSize)
+	page = page > lastPage ? lastPage : page
+	page = page < 1 ? 1 : page
+	const offset = (page - 1) * pageSize
+  
+	const results = await collection.find({})
+	  .sort({ _id: 1 })
+	  .skip(offset)
+	  .limit(pageSize)
+	  .toArray()
+  
+	return {
+	  courses: results,
+	  page: page,
+	  totalPages: lastPage,
+	  pageSize: pageSize,
+	  count: count
+	}
+  }
+  exports.getCoursesPage = getCoursesPage
+
 async function insertNewCourse(course) {
 	let courseValues = {};
 	if (validateAgainstSchema(course, CourseSchema)) {
 		const db = getDbReference();
 		courseValues = extractValidFields(course, CourseSchema);
+		courseValues.students = [];
+		courseValues.assignments = [];
 		const collection = db.collection('courses');
 		const result = await collection.insertOne(courseValues);
 		return result.insertedId;
@@ -85,11 +114,9 @@ exports.deleteCourseById = deleteCourseById;
 
 async function getStudentsByCourse(id) {
 	const db = getDbReference();
-	const collection = db.collection('users');
-	const studentsByCourse = await collection
-		.aggregate([{ $match: { courseId: id } }])
-		.toArray();
-	return studentsByCourse;
+	const collection = db.collection('courses');
+	const course = await collection.find({ _id: new ObjectId(id) }).toArray();
+	return course[0].students;
 }
 exports.getStudentsByCourse = getStudentsByCourse;
 
@@ -102,3 +129,35 @@ async function getAssignmentsByCourse(id) {
 	return studentsByCourse;
 }
 exports.getAssignmentsByCourse = getAssignmentsByCourse;
+
+async function addStudentsToCourse(id, studentIDs) {
+	const db = getDbReference();
+	const collection = db.collection('courses');
+	await collection.updateOne(
+		{ _id: new ObjectId(id) },
+		{
+			$addToSet: {
+				students: {
+					$each: studentIDs,
+				},
+			},
+		}
+	);
+}
+exports.addStudentsToCourse = addStudentsToCourse;
+
+async function removeStudentsFromCourse(id, studentIDs) {
+	const db = getDbReference();
+	const collection = db.collection('courses');
+	await collection.updateOne(
+		{ _id: new ObjectId(id) },
+		{
+			$pull: {
+				students: {
+					$in: studentIDs,
+				},
+			},
+		}
+	);
+}
+exports.removeStudentsFromCourse = removeStudentsFromCourse;

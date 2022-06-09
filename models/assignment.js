@@ -9,18 +9,9 @@ const AssignmentSchema = {
 	courseId: { required: true },
 	title: { required: true },
 	points: { required: true },
-	dueDate: { required: true },
-	courseId: { required: true },
+	due: { required: true },
 };
 exports.AssignmentSchema = AssignmentSchema;
-
-async function getAllAssignments() {
-	const db = getDbReference();
-	const collection = db.collection('assignments');
-	const assignments = await collection.find({}).toArray();
-	return assignments;
-}
-exports.getAllAssignments = getAllAssignments;
 
 async function insertNewAssignment(assignment) {
 	let assignmentValues = {};
