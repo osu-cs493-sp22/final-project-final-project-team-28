@@ -6,6 +6,11 @@ services:
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
       MONGO_INITDB_DATABASE: ${MONGO_DB_NAME}
 
+  redis:
+    image: redis
+    ports:
+      - 6379:6379
+
   db-init:
     build: .
     environment:
@@ -19,8 +24,6 @@ services:
     depends_on:
       - db
     restart: on-failure
-
-
 
   api:
     build: .
